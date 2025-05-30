@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>量子解算器</title>
+    <style>
+        :root {
+            --base-font: clamp(1rem, 3vw, 1.2rem);
+            --bg-color: #fff;
+            --text-color: #000;
+            --border-color: #ddd;
+            --button-bg: linear-gradient(45deg, #eee, #ccc);
+            --button-hover: linear-gradient(45deg, #ddd, #bbb);
+            --highlight: #ffeb3b;
+            --progress-bg: #e0e0e0;
+            --progress-bar: #4CAF50;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            line-height: 1.6;
+            padding: 2rem;
+            font-size: var(--base-font);
+        }
+
+        .header {
+            padding: 2rem;
+            text-align: center;
+            background: linear-gradient(45deg, #f0f0f0, #e0e0e0);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            margin-bottom: 2rem;
+        }
+
+        .container {
+            flex: 1;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: rgba(0, 0, 0, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: clamp(2rem, 5vw, 2.5rem);
+            margin-bottom: 1.5rem;
+            text-align: center;
+            letter-spacing: 1.5px;
+            color: #333;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            max-height: 240px;
+            padding: 1.2rem;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            font-size: var(--base-font);
+            resize: vertical;
+            background: var(--bg-color);
+            color: var(--text-color);
+            caret-color: #333;
+            transition: all 0.3s ease;
+        }
+
+        .button {
+            background: var(--button-bg);
+            color: var(--text-color);
+            border: none;
+            border-radius: 12px;
+            padding: 1.2rem 2.5rem;
+            font-size: var(--base-font);
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .button:hover {
+            background: var(--button-hover);
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 30px;
+            background: var(--progress-bg);
+            border-radius: 4px;
+            margin: 1.5rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--progress-bar);
+            width: 0;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .thinking-area {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            border: 1px solid var(--border-color);
+            max-height: 200px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .scroll-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .typing-container {
+            white-space: pre-wrap;
+            width: 100%;
+            min-height: 200px;
+            position: relative;
+            padding: 1.5rem;
+            box-sizing: border-box;
+        }
+
+        .typing-container::after {
+            content: "";
+            display: inline-block;
+            width: 2px;
+            height: 1em;
+            background-color: #666;
+            animation: blink 0.7s step-end infinite;
+            margin-left: 5px;
+        }
+
+        .highlight {
+            color: #ff2d2d;
+            font-weight: bold;
+        }
+
+        @keyframes blink {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>量子解算器</h1>
+    </div>
+    
+    <div class="container">
+        <div class="input-group">
+            <textarea id="questionInput" placeholder="输入你想问的吧。" autofocus></textarea>
+            <div class="progress-container">
+                <div class="progress-bar"></div>
+                <span class="progress-text">0%</span>
+            </div>
+            <button class="button" id="startButton">▶ 开始解算</button>
+        </div>
+        
+        <div class="thinking-area" id="thinkingArea">
+            <div class="scroll-container" id="scrollContainer">
+                <div class="typing-container" id="thinkingText"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const startButton = document.getElementById('startButton');
+            const questionInput = document.getElementById('questionInput');
+            const thinkingText = document.getElementById('thinkingText');
+            const thinkingArea = document.getElementById('thinkingArea');
+            const scrollContainer = document.getElementById('scrollContainer');
+            const progressBar = document.querySelector('.progress-bar');
+            const progressText = document.querySelector('.progress-text');
+
+            let isProcessing = false;
+            let currentText = '';
+            let currentCharIndex = 0;
+            let totalSteps = 0;
+
+            const answerBank = [
+                "演算失败，需要更多量子比特进行运算",
+                "量子纠缠态崩溃，重新初始化中...",
+                "观测者效应干扰，答案不确定",
+                "超弦理论验证失败，尝试其他维度",
+                "暗物质读数异常，暂停计算",
+                "平行宇宙通信中断，等待重连",
+                "量子泡沫干扰,数据流丢失",
+                "熵增过大,系统需要冷却",
+                "时间线紊乱,答案无法收敛",
+                "薛定谔的猫已死亡,终止进程",
+                "答案存在于虚数轴,无法显示",
+                "站起来去战斗", "值得做的事情", "不如直接问", "跳出舒适圈", "答案在下一步",
+                "别等了", "转身离开", "试试看", "先做再说", "停下来思考", "答案在对方眼里",
+                "不必强求", "时间会证明", "尊重彼此", "放下执念", "真诚最重要", "距离产生美",
+                "顺其自然", "不要回头", "心照不宣", "能力即答案", "学会倾听", "别怕犯错",
+                "机会在眼前", "提升自己", "团队合作", "保持专注", "适应变化", "别太在意",
+                "未来可期", "答案在行动中", "先看清问题", "不必纠结", "接受不完美", "转换视角",
+                "放下焦虑", "答案会浮现", "别想太多", "保持好奇", "一切皆有可能", "你已足够好",
+                "相信直觉", "别否定自己", "接受现实", "保持乐观", "放慢脚步", "专注当下",
+                "学会放手", "答案在内心", "你是主角", "时机未到", "未来可期", "珍惜此刻",
+                "命由心造", "别怕等待", "命运自有安排", "时间会治愈", "把握今天", "顺其自然",
+                "人生如戏", "泡枸杞吧", "别问了", "多读本书", "吃顿好的", "睡一觉再说",
+                "别较真", "买杯奶茶", "看开点", "别当真", "人间值得", "别浪费时间", "及时止损",
+                "别做傻事", "冷静下来", "别太冲动", "量力而行", "别勉强", "别回头", "别纠结",
+                "别逃避", "答案在细节", "万物皆有因", "平衡之道", "简单即智慧", "答案在过程",
+                "舍得之间", "答案在光里", "万物皆流动", "答案在呼吸", "心即是答案", "你已知道",
+                "答案在风中", "一切刚刚好", "答案即问题", "问错了问题", "答案在明天", "答案在书中",
+                "答案在脚下", "答案在爱里", "答案是你", "保持耐心", "放下执念", "接受现实", "勇敢尝试",
+                "专注当下", "调整方向", "相信直觉", "制定计划", "立即行动", "不必强求", "学会倾听",
+                "控制情绪", "突破极限", "珍惜时间", "减少拖延", "保持乐观", "正视问题", "寻求帮助",
+                "自我反思", "放弃无效", "抓住机会", "简化流程", "提升技能", "保持健康", "管理压力",
+                "设定目标", "克服恐惧", "接受不完美", "专注重要", "停止比较", "培养习惯", "清理杂物",
+                "优化选择", "保持灵活", "坚持原则", "释放压力", "避免冲动", "增强自信", "减少焦虑",
+                "享受过程", "学会拒绝", "保持好奇", "探索未知", "积累经验", "避免重复", "保持平衡",
+                "尊重他人", "表达需求", "倾听内心", "制定规则", "打破常规", "保持专注", "提高效率",
+                "减少干扰", "增强韧性", "接受反馈", "改进不足", "保持真诚", "避免虚伪", "培养耐心",
+                "学会等待", "把握现在", "规划未来", "管理财务", "建立边界", "保持独立", "避免依赖",
+                "提升认知", "拓展视野", "保持开放", "避免偏见", "学会换位", "减少抱怨", "积极行动",
+                "接受挑战", "克服懒惰", "保持纪律", "避免拖延", "增强执行力", "分解任务", "设定优先级",
+                "避免分心", "学会复盘", "总结经验", "保持成长", "接受变化", "适应环境", "保持灵活",
+                "培养自信", "减少自我怀疑", "坚持目标", "避免半途而废", "学会放松", "管理精力", "保持平衡",
+                "接受帮助", "建立支持系统", "保持沟通", "学会妥协", "坚持底线", "保持尊重", "培养同理心",
+                "理解差异", "保持礼貌", "学会赞美", "给予鼓励", "保持积极", "培养幽默感", "缓解紧张",
+                "保持轻松", "学会享受", "珍惜当下", "保持感恩", "记录美好", "培养乐观", "面对困难",
+                "寻找解决方案", "保持勇气", "克服恐惧", "学会坚持", "提升能力", "弥补短板", "发挥优势",
+                "保持竞争力", "学习新知", "拓展技能", "保持更新", "培养创造力", "突破思维限制", "保持好奇心",
+                "探索可能性", "学会批判思考", "验证假设", "保持理性", "收集信息", "分析利弊", "做出明智选择",
+                "保持客观", "学会倾听", "尊重不同意见", "保持开放心态", "寻求共识", "包容差异", "建立信任",
+                "保持诚信", "履行承诺", "保持可靠", "学会合作", "发挥团队力量", "明确分工", "保持协调",
+                "管理人际关系", "设定界限", "培养自我意识", "了解价值观", "保持真实", "接受反馈", "强化优点",
+                "保持成长心态", "学习失败", "调整策略", "保持耐心", "长期坚持", "设定阶段性目标", "定期复盘",
+                "保持灵活性", "享受旅程", "坏运气！你的运气糟糕透了。你有千分之一的可能获得坏运气，但谁能说这不是一种好运气呢？"
+            ];
+
+            const initializeStages = (userInput) => {
+                const mathMatch = userInput.match(/^\s*(\d+)\s*([+-])\s*(\d+)\s*=?\s*$/);
+                
+                if (mathMatch) {
+                    const num1 = parseInt(mathMatch[1]);
+                    const operator = mathMatch[2];
+                    const num2 = parseInt(mathMatch[3].split('=')[0]);
+                    return calculateMath(num1, operator, num2);
+                } else {
+                    return [
+                        "■ 思考进程启动...",
+                        `■ 用户问题：${userInput}`,
+                        "■ 分析问题复杂度...★★★★★ 需要量子纠缠级别的计算资源",
+                        "■ 初始化薛定谔方程求解器...加载中...",
+                        "■ 波函数坍缩概率计算中...Ψ(x,t) = ?",
+                        "■ 根据叠加原理，意识可能同时处于清醒和梦境状态,直到被观测...",
+                        "■ 引用海森堡不确定性原理：观测行为本身会影响被观测系统",
+                        "■ 尝试用量子隧穿效应解释潜意识突破...可能性：37.8%",
+                        "■ 正在构建多世界解释模型...分支数: ∞",
+                        "■ 考虑退相干理论...环境干扰因素过多,思考过程可能不收敛",
+                        "■ 应用量子芝诺效应...冻结问题状态以避免过早坍缩",
+                        "■ 启动量子傅里叶变换...频率分析中...",
+                        "■ 平行宇宙中已有73.5%的副本找到了答案",
+                        "■ 正在进行量子退火算法优化...温度参数: 0.0001K",
+                        "■ 波函数逐渐收敛...置信度提升至68.9%",
+                        "■ 根据量子引力理论，意识可能与暗物质存在相互作用...",
+                        "■ 最终答案生成中...请稍候..."
+                    ];
+                }
+            };
+
+            const calculateMath = (a, op, b) => {
+                const result = {
+                    steps: [],
+                    answer: 0
+                };
+
+                result.steps.push(`■ 计算 ${a} ${op} ${b}...`);
+                
+                switch(op) {
+                    case '+':
+                        result.answer = a + b;
+                        result.steps.push(`■ 量子叠加态计算：${a} + ${b} = ${result.answer}`);
+                        break;
+                    case '-':
+                        result.answer = a - b;
+                        result.steps.push(`■ 量子退相干计算：${a} - ${b} = ${result.answer}`);
+                        break;
+                }
+
+                result.steps.push(`■ 最终结果：${result.answer} (置信度100%)`);
+                return result.steps;
+            };
+
+            const scrollToBottom = () => {
+                thinkingArea.scrollTop = thinkingArea.scrollHeight;
+            };
+
+            const quantumThinking = () => {
+                if (isProcessing) return;
+                isProcessing = true;
+                
+                const userInput = questionInput.value.trim();
+                const stages = initializeStages(userInput);
+                totalSteps = stages.length;
+                thinkingText.textContent = '';
+                progressBar.style.width = '0';
+                progressText.textContent = '0%';
+
+                const allText = stages.join('\n');
+                const typeSpeed = 100;
+
+                let currentCharIndex = 0;
+                const typeInterval = setInterval(() => {
+                    if (currentCharIndex >= allText.length) {
+                        clearInterval(typeInterval);
+                        finalizeThinking();
+                        return;
+                    }
+
+                    const char = allText[currentCharIndex];
+                    currentText += char;
+                    thinkingText.textContent = currentText;
+                    currentCharIndex++;
+
+                    if (char === '\n' || currentCharIndex % 5 === 0) {
+                        scrollToBottom();
+                    }
+
+                    const progress = Math.floor((currentCharIndex / allText.length) * 100);
+                    if (progress > parseInt(progressText.textContent)) {
+                        progressBar.style.width = `${progress}%`;
+                        progressText.textContent = `${progress}%`;
+                    }
+
+                    if (char === '\n') {
+                        setTimeout(() => thinkingText.textContent += '......', 10);
+                    }
+                }, typeSpeed);
+
+                const updateProgress = () => {
+                    if (!isProcessing) return;
+                    const progress = (currentCharIndex / allText.length) * 100;
+                    loadingProgress.style.width = `${progress}%`;
+                    requestAnimationFrame(updateProgress);
+                };
+                updateProgress();
+            };
+
+            const finalizeThinking = () => {
+                isProcessing = false;
+                const answer = document.createElement('div');
+                answer.textContent = "\n答案：" + generateAnswer();
+                answer.style.color = '#ff2d2d';
+                thinkingText.appendChild(answer);
+                scrollToBottom();
+            };
+
+            const generateAnswer = () => {
+                const mathMatch = questionInput.value.match(/^\s*(\d+)\s*([+-])\s*(\d+)\s*=?\s*$/);
+                
+                if (mathMatch) {
+                    const num1 = parseInt(mathMatch[1]);
+                    const operator = mathMatch[2];
+                    const num2 = parseInt(mathMatch[3].split('=')[0]);
+                    return `${num1} ${operator} ${num2} = ${eval(`${num1}${operator}${num2}`)}`;
+                }
+                return answerBank[Math.floor(Math.random() * answerBank.length)];
+            };
+
+            startButton.addEventListener('click', () => {
+                if (!isProcessing && questionInput.value.trim()) {
+                    quantumThinking();
+                }
+            });
+
+            questionInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !isProcessing) {
+                    e.preventDefault();
+                    startButton.click();
+                }
+            });
+            questionInput.focus();
+        });
+    </script>
+</body>
+</html>
